@@ -1,7 +1,4 @@
-const tbodyTarget = document.querySelector('tbody');
-const inputTarget = document.querySelector('input[name=network]');
-const blockTarget = document.querySelector('input[name=block]');
-const graphTarget = document.querySelector('#graphCompare'); //const graphTotalIssuedTarget = document.querySelector('#graphTotalIssued');
+const tbodyTarget = document.querySelector('tbody'); //const graphTotalIssuedTarget = document.querySelector('#graphTotalIssued');
 
 const networkTarget = document.querySelector('#network var');
 const SUPPORTED_NETWORKS = {
@@ -10,21 +7,40 @@ const SUPPORTED_NETWORKS = {
   'rinkeby': 4,
   'kovan': 42
 };
+
+if (typeof window.ethereum !== 'undefined') {
+  console.log('MetaMask is installed!');
+}
+
 const loadingGIF = '<img src="https://media.giphy.com/media/TvLuZ00OIADoQ/giphy.gif" width=150 />';
+const accounts = ethereum.request({
+  method: 'eth_requestAccounts'
+});
+const account = accounts[0];
+const ethereumButton = document.querySelector('.enableEthereumButton');
+const showAccount = document.querySelector('.showAccount');
+ethereumButton.addEventListener('click', () => {
+  getAccount();
+});
+
+async function getAccount() {
+  const accounts = await ethereum.request({
+    method: 'eth_requestAccounts'
+  });
+  const account = accounts[0];
+  showAccount.innerHTML = account;
+}
 
 const start = async () => {
   tbodyTarget.innerHTML = loadingGIF;
-  graphTarget.innerHTML = loadingGIF; //  graphTotalIssuedTarget.innerHTML = loadingGIF;
-
-  const network = inputTarget.value.toLowerCase() in SUPPORTED_NETWORKS ? inputTarget.value.toLowerCase() : 'mainnet';
-  networkTarget.innerHTML = network;
+  const network = 1;
   const networkId = SUPPORTED_NETWORKS[network];
   const snxjs = new SynthetixJs.SynthetixJs({
     networkId
   });
   const toUtf8Bytes = SynthetixJs.SynthetixJs.utils.formatBytes32String;
   const formatEther = snxjs.utils.formatEther;
-  const fromBlock = blockTarget.value;
+  const fromBlock = 0;
   const blockOptions = fromBlock ? {
     blockTag: Number(fromBlock)
   } : {};
@@ -105,22 +121,6 @@ const start = async () => {
   const resultsWithValues = results.filter(({
     totalSupplyInUSD
   }) => Number(totalSupplyInUSD) > 100);
-  new frappe.Chart(graphTarget, {
-    title: 'Top 10 Synth Breakdown (in millions)',
-    data: {
-      labels: resultsWithValues.slice(0, 10).map(({
-        synth
-      }) => synth),
-      datasets: [{
-        name: 'USD',
-        values: resultsWithValues.slice(0, 10).map(({
-          totalSupplyInUSD
-        }) => totalSupplyInUSD / 1e6)
-      }]
-    },
-    type: 'bar',
-    colors: ['#7cd6fd', '#743ee2']
-  });
   /* Note: no longer works without a provider that supports blockTag (an archive node)
   // track total issued over time
   const currentBlock = await snxjs.contractSettings.provider.getBlockNumber();
