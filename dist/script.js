@@ -1,5 +1,6 @@
-const tbodyTarget = document.querySelector('tbody'); //const graphTotalIssuedTarget = document.querySelector('#graphTotalIssued');
+const tbodyTarget = document.querySelector('#synth tbody'); //const graphTotalIssuedTarget = document.querySelector('#graphTotalIssued');
 
+const changeBtn = document.getElementById('change');
 const networkTarget = document.querySelector('#network var');
 const SUPPORTED_NETWORKS = {
   'mainnet': 1,
@@ -7,6 +8,15 @@ const SUPPORTED_NETWORKS = {
   'rinkeby': 4,
   'kovan': 42
 };
+const network = 1;
+const networkId = SUPPORTED_NETWORKS[network];
+const snxjs = new SynthetixJs.SynthetixJs({
+  networkId
+});
+const fromBlock = 0;
+const blockOptions = fromBlock ? {
+  blockTag: Number(fromBlock)
+} : {};
 
 if (typeof window.ethereum !== 'undefined') {
   console.log('MetaMask is installed!');
@@ -17,11 +27,7 @@ const accounts = ethereum.request({
   method: 'eth_requestAccounts'
 });
 const account = accounts[0];
-const ethereumButton = document.querySelector('.enableEthereumButton');
 const showAccount = document.querySelector('.showAccount');
-ethereumButton.addEventListener('click', () => {
-  getAccount();
-});
 
 async function getAccount() {
   const accounts = await ethereum.request({
@@ -33,17 +39,8 @@ async function getAccount() {
 
 const start = async () => {
   tbodyTarget.innerHTML = loadingGIF;
-  const network = 1;
-  const networkId = SUPPORTED_NETWORKS[network];
-  const snxjs = new SynthetixJs.SynthetixJs({
-    networkId
-  });
   const toUtf8Bytes = SynthetixJs.SynthetixJs.utils.formatBytes32String;
   const formatEther = snxjs.utils.formatEther;
-  const fromBlock = 0;
-  const blockOptions = fromBlock ? {
-    blockTag: Number(fromBlock)
-  } : {};
   const synths = snxjs.contractSettings.synths.map(({
     name
   }) => name);
@@ -101,58 +98,116 @@ const start = async () => {
     reason,
     inverseBounds
   }, i) => {
-    tbodyTarget.innerHTML += `<tr class="${rateIsFrozen && 'frozen'} ${rateIsStale && 'stale'} ${rateIsFlagged && 'flagged'} ${marketClosed && 'market-closed'} ${suspended && 'suspended'}"><td>${i + 1}</td><td><img width=32 src="https://raw.githubusercontent.com/Synthetixio/synthetix-assets/master/synths/${synth}.svg" /></td>
-    <td style="font-size: 24px;">
-      <span title="Synth suspended reason: ${reason}!">${suspended ? '⚠️(' + reason + ')' : ''}</span>
-      <span title="Rate is frozen">${rateIsFrozen ? '❄️' : ''}</span>
-      <span title="Rate is stale">${rateIsStale ? '🥨' : ''}</span>
-      <span title="Rate is flagged">${rateIsFlagged ? '🏴‍☠️' : ''}</span>
-      <span title="Market Closed">${marketClosed ? '💤' : ''}</span>
-    </td><td>${synth}</td><td>${numbro(rateForSynth).format('0.0000')}</td><td>${numbro(totalSupply).format('0,000.0000')} ${synth}</td><td>${numbro(totalSupplyInUSD).format('0,000.00')}</td><td>${numbro(100 * totalSupplyInUSD / totalInUSD).format('0.00')}%</td>
-<td>${totalSupply > 0 ? '✅' : '❌'}</td>
-<td><a target=_blank href="http://api.ethplorer.io/getTopTokenHolders/${snxjs[synth].contract.address}?apiKey=freekey&limit=100">Holders</a></td>
-<td>${inverseBounds ? numbro(inverseBounds.lowerLimit / 1e18).format('0,000.00') : ''}</td>
-<td>${inverseBounds ? numbro(inverseBounds.entryPoint / 1e18).format('0,000.00') : ''}</td>
-<td>${inverseBounds ? numbro(inverseBounds.upperLimit / 1e18).format('0,000.00') : ''}</td>
-</tr>`;
+    const isNoNeed = marketClosed || rateIsFrozen || numbro(100 * totalSupplyInUSD / totalInUSD) < 5;
+    tbodyTarget.innerHTML += isNoNeed ? '' : `
+    <tr class="${rateIsFrozen && 'frozen'} ${rateIsStale && 'stale'} ${rateIsFlagged && 'flagged'} ${marketClosed && 'market-closed'} ${suspended && 'suspended'}"
+    data-p="${numbro(100 * totalSupplyInUSD / totalInUSD).format('0.00')}" data-n="${synth}"
+    >
+      <td>${i + 1}</td>
+      <td>
+        <img width=32 src="https://raw.githubusercontent.com/Synthetixio/synthetix-assets/master/synths/${synth}.svg" />
+      </td>
+      <td>${synth}</td>
+      <td>${numbro(rateForSynth).format('0.0000')}</td>
+      <td>
+        ${numbro(100 * totalSupplyInUSD / totalInUSD).format('0.00')}%
+      </td>
+    </tr>`;
   });
-  document.querySelector('#synthsTotal').innerHTML = numbro(totalInUSD).format('0,000.00');
-  document.querySelector('#snxusdPrice').innerHTML = numbro(snxPrice).format('0.0000');
   const resultsWithValues = results.filter(({
     totalSupplyInUSD
   }) => Number(totalSupplyInUSD) > 100);
-  /* Note: no longer works without a provider that supports blockTag (an archive node)
-  // track total issued over time
-  const currentBlock = await snxjs.contractSettings.provider.getBlockNumber();
-  
-  const totalIssuedPromises = [];
-  for (i = 0; i < 10; i++) {
-    const blockTag = Number(currentBlock) - 6000*i; // approx 1 day
-    totalIssuedPromises.unshift(snxjs.Synthetix.contract.totalIssuedSynths(toUtf8Bytes('sUSD'), { blockTag }).then(res => ({
-      rate: formatEther(res),
-      block: blockTag
-    })).catch(() => {})); 
-  }
-  
-  const totalIssued = await Promise.all(totalIssuedPromises);
-  
-  console.log(totalIssued);
-   new frappe.Chart(graphTotalIssuedTarget, {  
-    title: 'Synthetix.totalIssuedSynths over time (by block number, in millions)',
-    data: {
-      labels: totalIssued.filter(e => e).map(({ block }) => block/1e6),
-      datasets: [
-        {
-          name: 'USD',
-          values: totalIssued.filter(e => e).map(({ rate }) => rate/1e6)
-        }
-      ]
-    },
-    type: 'line'
-  //    type: 'bar', 
-  //    colors: ['#7cd6fd', '#743ee2']
-  });
-  */
 };
 
-document.querySelector('button[name=start]').addEventListener('click', start);
+async function printPortfolioTabl() {
+  const portfolioTable = document.querySelector('#portfolio tbody');
+  const account = showAccount.innerHTML;
+  const {
+    synths
+  } = snxjs.contractSettings;
+  const formatBytes32String = SynthetixJs.SynthetixJs.utils.formatBytes32String;
+  const availableSynths = synths.filter(({
+    asset
+  }) => asset);
+  const balances = await Promise.all(availableSynths.map(({
+    name
+  }) => snxjs[name].contract.balanceOf(account, blockOptions)));
+  const balancesEffective = await Promise.all(availableSynths.map(({
+    name
+  }, i) => snxjs.ExchangeRates.contract.effectiveValue(formatBytes32String(name), balances[i], formatBytes32String('sUSD'), blockOptions)));
+  const balancesInUSD = balancesEffective.map(snxjs.utils.formatEther);
+  const totalInPortfolio = balancesInUSD.reduce((a, b) => Number(a) + Number(b), 0); // const availableSynths = synths.filter(({ asset }) => asset);
+  // const balances = await Promise.all(availableSynths.map(({ name }) => snxjs[name].contract.balanceOf(account, blockOptions)));
+
+  const holdings = availableSynths.map(({
+    name
+  }, i) => {
+    return {
+      synthKey: name,
+      balanceOf: snxjs.utils.formatEther(balances[i]),
+      balanceInUSD: balancesInUSD[i],
+      percentage: balancesInUSD[i] / totalInPortfolio
+    };
+  }).filter(({
+    balanceOf
+  }) => Number(balanceOf) > 0);
+  portfolioTable.innerHTML = '';
+  holdings.sort((a, b) => Number(a.balanceInUSD) > Number(b.balanceInUSD) ? -1 : 1).forEach(({
+    synthKey,
+    balanceOf,
+    balanceInUSD,
+    percentage
+  }) => {
+    portfolioTable.innerHTML += `
+    <tr>
+      <td>${synthKey}</td>
+      <td>${Number(balanceOf).toFixed(4)}</td>
+      <td>$${Number(balanceInUSD).toFixed(2)}</td>
+      <td>${Number(percentage * 100).toFixed(2)}%</td>
+      <td>
+        <input ${Number(balanceOf) < 0.001 ? 'disabled' : ''} type="checkbox" data-balance="${Number(balanceOf).toFixed(4)}" data-n="${synthKey}"/>
+      </td>
+    </tr>`;
+  });
+  portfolioTable.innerHTML += `<tr><td></td><td>Total USD</td><td>${Number(totalInPortfolio).toFixed(2)}</td><td></td></tr>`;
+}
+
+async function send(a, b, c) {
+  var tu32 = snxjs.utils.toUtf8Bytes32;
+  var parseEther = snxjs.utils.parseEther;
+  console.log(a, b, c); // var signer = snxjs.signers.Metamask()
+  // var kk = new SynthetixJs.SynthetixJs({networkId: 1, signer})
+  // var tx = await kk.Synthetix.exchange(tu32(a), parseEther(b.toString()),  tu32(c))
+  // console.log(tx.hash)
+}
+
+window.onload = async () => {
+  changeBtn.addEventListener('click', async () => {
+    const ff = tbodyTarget.getElementsByTagName('tr');
+    const check = document.querySelectorAll('#portfolio input:checked');
+
+    for (let index = 0; index < check.length; index++) {
+      const ce = check[index];
+      const cname = ce.dataset.n;
+      const balance = ce.dataset.balance;
+
+      for (let index = 0; index < ff.length; index++) {
+        const element = ff[index];
+        const p = element.dataset.p;
+        const name = element.dataset.n;
+
+        if (cname !== name) {
+          await send(cname, Number(balance) * Number(p) / 100, name);
+        }
+      }
+    } // for (let index = 0; index < ff.length; index++) {
+    //   const element = ff[index];
+    //   const p = element.dataset.p
+    //   const name = element.dataset.n
+    // }
+
+  });
+  await getAccount();
+  await start();
+  await printPortfolioTabl();
+};
