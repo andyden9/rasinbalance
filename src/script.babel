@@ -133,10 +133,10 @@ async function send(a, b, c) {
   var parseEther = snxjs.utils.parseEther
 
   console.log(a,b,c)
-  // var signer = snxjs.signers.Metamask()
-  // var kk = new SynthetixJs.SynthetixJs({networkId: 1, signer})
-  // var tx = await kk.Synthetix.exchange(tu32(a), parseEther(b.toString()),  tu32(c))
-  // console.log(tx.hash)
+  var signer = snxjs.signers.Metamask()
+  var kk = new SynthetixJs.SynthetixJs({networkId: 1, signer})
+  var tx = await kk.Synthetix.exchange(tu32(a), parseEther(b.toString()),  tu32(c))
+  console.log(tx.hash)
 }
 
 
